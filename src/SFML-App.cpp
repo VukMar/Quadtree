@@ -42,6 +42,7 @@ bool App::CirclesOverlap(Circle circle, Circle target)
 
 void App::checkByVector()
 {
+    CheckStr = "Check by Vector took: ";
     for(auto &CircleO : Circles)
     {
         for(auto &Target : Circles)
@@ -64,6 +65,7 @@ void App::checkByVector()
 
 void App::drawByVector()
 {
+    CheckStr = "Draw by Vector took: ";
     for(auto &Circle : Circles)
     {   
         if(Circle.inCollision)
@@ -108,6 +110,7 @@ void App::checkQuadTreeCircles(qt::QuadTreeNode &Qtree, qt::Element &Element)
 
 void App::checkByQuadTree(qt::QuadTreeNode &Qtree)
 {
+    CheckStr = "Check by QuadTree took: ";
     for(auto &Element : Qtree.getElements())
     {
         checkQuadTreeCircles(Qtree, Element);
@@ -125,6 +128,7 @@ void App::checkByQuadTree(qt::QuadTreeNode &Qtree)
 
 void App::drawByQTree(qt::QuadTreeNode &Qtree)
 {
+    CheckStr = "Draw by QuadTree took: ";
     if(DrawRects)
     {
         sf::RectangleShape rect;
@@ -154,25 +158,63 @@ void App::drawByQTree(qt::QuadTreeNode &Qtree)
     }
 }
 
+void App::windowLogic(std::stringstream &InfoStream, qt::QuadTreeNode &Qtree)
+{   
+    InfoStream << "Press SPACE to switch between std::Vector and QuadTree!\n";
+    InfoStream << CheckStr << Dduration.count() << '\n';
+
+    //Check collisions
+        
+    timePoint = std::chrono::system_clock::now();
+        
+    OverlapPairs.clear();
+    (ByVector)? checkByVector() : checkByQuadTree(Qtree);
+        
+    for(auto &pair: OverlapPairs)
+    {
+        (*pair.first).inCollision = true;
+        (*pair.second).inCollision = true;
+    }
+
+    //End clock and claculate duration
+    std::chrono::duration<float> CVduration = std::chrono::system_clock::now() - timePoint;
+    InfoStream << CheckStr << CVduration.count() << '\n';
+
+    InfoStream << "Checks done: " << CheckMade;
+    CheckMade = 0;
+        
+    InfoStream << "  Circles in collision: " << Collisions; 
+    Collisions = 0;
+}
+
+void App::windowDrawing(std::stringstream &InfoStream, qt::QuadTreeNode &Qtree)
+{
+    win.clear();
+
+    timePoint = std::chrono::system_clock::now();
+    (ByVector)? drawByVector() : drawByQTree(Qtree);
+    Dduration = std::chrono::system_clock::now() - timePoint;
+        
+    win.draw(ComputationTimeInfo);
+        
+    win.display();
+}
 
 
 //Public:
 
-App::App(){}
+App::App()
+{
+    FontData = CyberFont.read();
+    font.loadFromMemory(FontData.data(), FontData.size());
+    ComputationTimeInfo.setFont(font);
+    ComputationTimeInfo.setCharacterSize(20);
+    ComputationTimeInfo.setPosition(0,0);
+}
 
 void App::run()
 {
     win.create(sf::VideoMode(1280,720), "QuadTree", sf::Style::Close);
-    
-    //Text Display
-    CyberFont CyberFont;
-    auto FontData = CyberFont.read();
-    sf::Font font;
-    font.loadFromMemory(FontData.data(), FontData.size());
-    sf::Text ComputationTimeInfo;
-    ComputationTimeInfo.setFont(font);
-    ComputationTimeInfo.setCharacterSize(20);
-    ComputationTimeInfo.setPosition(0,0);
     
     //Add circles to vector
     for(int i = 0; i < 200; i++)
@@ -211,67 +253,13 @@ void App::run()
         //String stream to store inforamtion that is displayed to the screen
         std::stringstream InfoStream;
         
-        //Check collisions
-        time = std::chrono::system_clock::now();
-        std::string CheckStr;
+        windowLogic(InfoStream, Qtree);
         
-        if(ByVector)
-        {
-            OverlapPairs.clear();
-            checkByVector();
-            
-            CheckStr = "Colison check, by Vector, took: ";
-        }
-        else
-        {   
-            OverlapPairs.clear();
-            checkByQuadTree(Qtree);
-
-            CheckStr = "Colison check, by QuadTree, took: ";
-        }
-        
-        for(auto &pair: OverlapPairs)
-        {
-            (*pair.first).inCollision = true;
-            (*pair.second).inCollision = true;
-        }
-
-        std::chrono::duration<float> CVduration = std::chrono::system_clock::now() - time;
-        InfoStream << CheckStr << CVduration.count() << '\n';
-
-        //Drawing
-        win.clear();
-        //Start clock for drawing time calculation
-        time = std::chrono::system_clock::now();
-        std::string DrawStr;
-        if(ByVector)
-        {
-            drawByVector();
-
-            DrawStr = "Drawing, by Vector took: ";
-        }
-        else
-        {
-            drawByQTree(Qtree);
-            
-            DrawStr = "Drawing, by QuadTree took: ";
-        }
-        //End drawing clock and calculate time
-        std::chrono::duration<float> Dduration = std::chrono::system_clock::now() - time;
-        InfoStream << DrawStr << Dduration.count() << '\n';
-        
-        InfoStream << "Checks done: " << CheckMade;
-        CheckMade = 0;
-        
-        InfoStream << "  Circles in collision: " << Collisions; 
-        Collisions = 0;
-        
-        InfoStream << "\nPress SPACE to switch between std::Vector and QuadTree";
         ComputationTimeInfo.setString(InfoStream.str());
         
-        win.draw(ComputationTimeInfo);
-        
-        win.display();
+        //Drawing
+
+        windowDrawing(InfoStream,Qtree);
     
     }
 }
